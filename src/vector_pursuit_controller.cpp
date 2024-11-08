@@ -46,8 +46,8 @@ namespace vector_pursuit_controller
 
 VectorPursuitController::VectorPursuitController()
 :   initialized_(false),
-    is_running_(true),
-    is_prev_running_(false),
+    has_actived_(true),
+    prev_state_(false),
     goal_reached_(false),
     check_xy_(true)
 {
@@ -104,7 +104,7 @@ void VectorPursuitController::initialize(std::string name, tf2_ros::Buffer* tf, 
 void VectorPursuitController::runningCallback(
     const std_msgs::Bool::ConstPtr &msg)
 {
-    is_running_ = msg->data;
+    has_actived_ = msg->data;
 }
 
 void VectorPursuitController::reconfigureCB(Config& config, uint32_t level)
@@ -245,11 +245,10 @@ bool VectorPursuitController::computeVelocityCommands(geometry_msgs::Twist& cmd_
 
     goal_reached_ = false;
     nav_msgs::Path transformed_plan;
-    double angle_to_goal;
 
     // Transform path to robot base frame
     try {
-        if (!transformGlobalPlan(robot_pose, transformed_plan, angle_to_goal)) {
+        if (!transformGlobalPlan(robot_pose, transformed_plan)) {
             return false;
         }
     }
@@ -290,11 +289,12 @@ bool VectorPursuitController::computeVelocityCommands(geometry_msgs::Twist& cmd_
     }
 
     double angle_to_heading;
+    double angle_to_goal;
     
     // Check if xy reached
-    if (isGoalReached(robot_pose)) {
+    if (isGoalReached(robot_pose, angle_to_goal)) {
         if (shouldRotateToGoalHeading(angle_to_goal)) {
-            ROS_INFO("%s: Rotating to GOAL heading...", controller_name_.c_str());
+            ROS_DEBUG("%s: Rotating to GOAL heading...", controller_name_.c_str());
             rotateToGoal(linear_vel, angular_vel, angle_to_goal);
         }
         else {
@@ -366,7 +366,9 @@ bool VectorPursuitController::isGoalReached()
     return false;
 }
 
-bool VectorPursuitController::isGoalReached(geometry_msgs::PoseStamped robot_pose)
+bool VectorPursuitController::isGoalReached(
+    geometry_msgs::PoseStamped robot_pose,
+    double &dyaw)
 {
     geometry_msgs::PoseStamped transformed_end_pose;
     if (!transformPose(tf_, costmap_ros_->getGlobalFrameID(),
@@ -374,11 +376,11 @@ bool VectorPursuitController::isGoalReached(geometry_msgs::PoseStamped robot_pos
         return false;
     }
     
-    if (is_prev_running_ != is_running_) {
+    if (prev_state_ != has_actived_) {
         check_xy_ = true;
-        is_running_ = false;
+        has_actived_ = false;
     }
-    is_prev_running_ = is_running_;
+    prev_state_ = has_actived_;
     
     double dx = robot_pose.pose.position.x - transformed_end_pose.pose.position.x,
            dy = robot_pose.pose.position.y - transformed_end_pose.pose.position.y;
@@ -391,13 +393,17 @@ bool VectorPursuitController::isGoalReached(geometry_msgs::PoseStamped robot_pos
             return false;
         }
     }
+
+    dyaw = angles::shortest_angular_distance(
+           tf2::getYaw(robot_pose.pose.orientation),
+           tf2::getYaw(transformed_end_pose.pose.orientation));
+
     return true;
 }
 
 bool VectorPursuitController::transformGlobalPlan(
     const geometry_msgs::PoseStamped & pose,
-    nav_msgs::Path& transformed_plan,
-    double &angle_to_goal)
+    nav_msgs::Path& transformed_plan)
 {
     if (global_plan_.poses.empty()) {
         ROS_ERROR("%s: Received plan with zero length", controller_name_.c_str());
@@ -412,10 +418,6 @@ bool VectorPursuitController::transformGlobalPlan(
         ROS_ERROR("%s: Unable to transform robot pose into global plan's frame", controller_name_.c_str());
         return false;
     }
-
-    double goal_yaw_ = tf2::getYaw(global_plan_.poses.back().pose.orientation);
-    double current_robot_yaw_ = tf2::getYaw(robot_pose.pose.orientation);
-    angle_to_goal = angles::normalize_angle(goal_yaw_ - current_robot_yaw_);
 
     // We'll discard points on the plan that are outside the local costmap
     double max_costmap_extent = getCostmapMaxExtent();

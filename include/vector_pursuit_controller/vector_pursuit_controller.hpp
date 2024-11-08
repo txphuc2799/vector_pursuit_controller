@@ -102,7 +102,7 @@ public:
      * @brief Check if robot reaches xy
      * @return If true, check yaw -> True if yaw reached.
      */
-    bool isGoalReached(geometry_msgs::PoseStamped robot_pose);
+    bool isGoalReached(geometry_msgs::PoseStamped robot_pose, double &dyaw);
 
     /**
      * @brief Get the orientation of the line segment between two points
@@ -132,8 +132,7 @@ protected:
      */
     bool transformGlobalPlan(
         const geometry_msgs::PoseStamped & pose,
-        nav_msgs::Path& transformed_plan,
-        double &angle_to_goal);
+        nav_msgs::Path& transformed_plan);
 
     /**
      * @brief Get lookahead distance
@@ -285,8 +284,8 @@ protected:
     geometry_msgs::PoseStamped goal_;
     
     bool initialized_;
-    bool is_running_;
-    bool is_prev_running_;
+    bool has_actived_;
+    bool prev_state_;
     bool goal_reached_;
     bool check_xy_;
     double control_duration_;
