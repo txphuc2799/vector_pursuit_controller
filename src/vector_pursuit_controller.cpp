@@ -367,7 +367,6 @@ bool VectorPursuitController::isGoalReached()
 {
     if (goal_reached_) {
         has_new_goal_ = true;
-        check_xy_ = true;
         ROS_INFO("%s: GOAL Reached!", controller_name_.c_str());
         return true;
     }
