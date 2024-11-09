@@ -29,7 +29,6 @@ namespace vector_pursuit_controller
 struct Parameters
 {
     std::string odom_topic_;
-    std::string running_topic_;
     double control_frequency_;
     double k_;
     double desired_linear_vel_;

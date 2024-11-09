@@ -27,7 +27,6 @@ namespace vector_pursuit_controller
 ParameterHandler::ParameterHandler(std::string name, ros::NodeHandle& pnh)
 {
   pnh.param("odom_topic", params_.odom_topic_, std::string("odom"));
-  pnh.param("running_topic", params_.running_topic_, std::string("running"));
   pnh.param("control_frequency", params_.control_frequency_, 20.0);
   pnh.param("k", params_.k_, 8.0);
   pnh.param("desired_linear_vel", params_.desired_linear_vel_, 0.5);
