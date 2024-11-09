@@ -52,7 +52,7 @@ ParameterHandler::ParameterHandler(std::string name, ros::NodeHandle& pnh)
   pnh.param("inflation_cost_scaling_factor", params_.inflation_cost_scaling_factor_, 3.0);
   pnh.param("use_rotate_to_heading", params_.use_rotate_to_heading_, true);
   pnh.param("rotate_to_heading_min_angle", params_.rotate_to_heading_min_angle_, 0.785);
-  pnh.param("path_angular_vel_scaling_angle", params_.path_angular_vel_scaling_angle_, 30.0);
+  pnh.param("path_angular_vel_scaling_angle", params_.path_angular_vel_scaling_angle_, 0.5);
   pnh.param("path_angle_scaling_factor", params_.path_angle_scaling_factor_, 1.2);
   pnh.param("rotate_to_path_max_angular_vel", params_.rotate_to_path_max_angular_vel_, 0.5);
   pnh.param("rotate_to_path_min_angular_vel", params_.rotate_to_path_min_angular_vel_, 0.05);
@@ -62,7 +62,7 @@ ParameterHandler::ParameterHandler(std::string name, ros::NodeHandle& pnh)
   pnh.param("max_robot_pose_search_dist", params_.max_robot_pose_search_dist_, 10.0);
   pnh.param("use_interpolation", params_.use_interpolation_, true);
   pnh.param("use_heading_from_path", params_.use_heading_from_path_, true);
-  pnh.param("goal_angular_vel_scaling_angle", params_.goal_angular_vel_scaling_angle_, 30.0);
+  pnh.param("goal_angular_vel_scaling_angle", params_.goal_angular_vel_scaling_angle_, 0.5);
   pnh.param("goal_angle_scaling_factor", params_.goal_angle_scaling_factor_, 1.2);
   pnh.param("rotate_to_goal_max_angular_vel", params_.rotate_to_goal_max_angular_vel_, 0.5);
   pnh.param("rotate_to_goal_min_angular_vel", params_.rotate_to_goal_min_angular_vel_, 0.05);
