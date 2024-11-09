@@ -269,9 +269,9 @@ protected:
      */
     double getCostmapMaxExtent() const;
 
-    void reconfigureCB(Config& config, uint32_t level);
+    bool hasGoalChanged(const geometry_msgs::PoseStamped &new_goal);
 
-    void runningCallback(const std_msgs::Bool::ConstPtr &msg);
+    void reconfigureCB(Config& config, uint32_t level);
 
     Parameters * params_;
     
@@ -281,11 +281,11 @@ protected:
     costmap_2d::Costmap2D* costmap_;
     base_local_planner::OdometryHelperRos odom_helper_;
     geometry_msgs::Twist robot_vel_;
-    geometry_msgs::PoseStamped goal_;
+    geometry_msgs::PoseStamped goal_pose_;
+    geometry_msgs::PoseStamped last_goal_;
     
     bool initialized_;
-    bool has_actived_;
-    bool prev_state_;
+    bool has_new_goal_;
     bool goal_reached_;
     bool check_xy_;
     double control_duration_;
@@ -293,11 +293,10 @@ protected:
 
     geometry_msgs::Twist last_cmd_vel_;
 
-    nav_msgs::Path global_plan_;
+    std::vector<geometry_msgs::PoseStamped> global_plan_;
     ros::Publisher global_path_pub_;
     ros::Publisher target_pub_;
     ros::Publisher target_arc_pub_;
-    ros::Subscriber running_sub_;
 
     std::unique_ptr<FootprintCollisionChecker<costmap_2d::Costmap2D *>> collision_checker_;
     std::unique_ptr<vector_pursuit_controller::ParameterHandler> param_handler_;

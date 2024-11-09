@@ -46,8 +46,6 @@ namespace vector_pursuit_controller
 
 VectorPursuitController::VectorPursuitController()
 :   initialized_(false),
-    has_actived_(true),
-    prev_state_(false),
     goal_reached_(false),
     check_xy_(true)
 {
@@ -70,6 +68,8 @@ void VectorPursuitController::initialize(std::string name, tf2_ros::Buffer* tf, 
         costmap_ros_ = costmap_ros;
         costmap_ = costmap_ros_->getCostmap();
 
+        has_new_goal_ = true;
+
         // Handles storage and dynamic configuration of parameters.
         // Returns pointer to data current param settings.
         param_handler_ = std::make_unique<ParameterHandler>(controller_name_, pnh_);
@@ -84,9 +84,6 @@ void VectorPursuitController::initialize(std::string name, tf2_ros::Buffer* tf, 
         target_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("lookahead_point", 1);
         target_arc_pub_ = nh_.advertise<nav_msgs::Path>("lookahead_collision_arc", 1);
 
-        running_sub_ = nh_.subscribe<std_msgs::Bool>(params_->running_topic_, 5,
-                                    &VectorPursuitController::runningCallback, this);
-
         // initialize collision checker and set costmap
         collision_checker_ = std::make_unique<FootprintCollisionChecker<costmap_2d::Costmap2D *>>(costmap_);
         collision_checker_->setCostmap(costmap_);
@@ -99,12 +96,6 @@ void VectorPursuitController::initialize(std::string name, tf2_ros::Buffer* tf, 
         ROS_INFO("Created %s plugin.", controller_name_.c_str());
         initialized_ = true;
     }
-}
-
-void VectorPursuitController::runningCallback(
-    const std_msgs::Bool::ConstPtr &msg)
-{
-    has_actived_ = msg->data;
 }
 
 void VectorPursuitController::reconfigureCB(Config& config, uint32_t level)
@@ -214,20 +205,13 @@ double getPositiveRadians(double angle)
 bool VectorPursuitController::setPlan(const std::vector<geometry_msgs::PoseStamped>& orig_global_plan)
 {
     // check if plugin is initialized
-    if(!initialized_)
-    {
+    if(!initialized_) {
         ROS_ERROR("%s has not been initialized, please call initialize() before using this planner",
                   controller_name_.c_str());
         return false;
     }
 
-    // store the global plan
-    global_plan_.header.stamp = ros::Time::now();
-    global_plan_.header.frame_id = orig_global_plan.back().header.frame_id;
-    global_plan_.poses = orig_global_plan;
-    goal_.header.frame_id = global_plan_.header.frame_id;
-    goal_.pose = orig_global_plan.back().pose;
-
+    global_plan_ = orig_global_plan;
     goal_reached_ = false;
     
     return true;
@@ -355,10 +339,22 @@ bool VectorPursuitController::computeVelocityCommands(geometry_msgs::Twist& cmd_
     return true;
 }
 
+bool VectorPursuitController::hasGoalChanged(
+    const geometry_msgs::PoseStamped &new_goal)
+{
+    if (last_goal_.header.frame_id != new_goal.header.frame_id) {
+        return true;
+    }
+
+    return last_goal_.pose.position.x != new_goal.pose.position.x
+           || last_goal_.pose.position.y != new_goal.pose.position.y
+           || tf2::getYaw(last_goal_.pose.orientation) != tf2::getYaw(new_goal.pose.orientation);
+}
+
 bool VectorPursuitController::isGoalReached()
 {
-    if (goal_reached_)
-    {
+    if (goal_reached_) {
+        has_new_goal_ = true;
         check_xy_ = true;
         ROS_INFO("%s: GOAL Reached!", controller_name_.c_str());
         return true;
@@ -372,15 +368,15 @@ bool VectorPursuitController::isGoalReached(
 {
     geometry_msgs::PoseStamped transformed_end_pose;
     if (!transformPose(tf_, costmap_ros_->getGlobalFrameID(),
-        goal_, transformed_end_pose, params_->transform_tolerance_)) {
+        goal_pose_, transformed_end_pose, params_->transform_tolerance_)) {
         return false;
     }
-    
-    if (prev_state_ != has_actived_) {
+
+    if (has_new_goal_ || hasGoalChanged(goal_pose_)) {
+        last_goal_ = goal_pose_;
+        has_new_goal_ = false;
         check_xy_ = true;
-        has_actived_ = false;
     }
-    prev_state_ = has_actived_;
     
     double dx = robot_pose.pose.position.x - transformed_end_pose.pose.position.x,
            dy = robot_pose.pose.position.y - transformed_end_pose.pose.position.y;
@@ -405,15 +401,20 @@ bool VectorPursuitController::transformGlobalPlan(
     const geometry_msgs::PoseStamped & pose,
     nav_msgs::Path& transformed_plan)
 {
-    if (global_plan_.poses.empty()) {
+    if (global_plan_.empty()) {
         ROS_ERROR("%s: Received plan with zero length", controller_name_.c_str());
         return false;
     }
 
+    // Save goal pose
+    goal_pose_.header.frame_id = global_plan_[0].header.frame_id;
+    goal_pose_.header.stamp = global_plan_[0].header.stamp;
+    goal_pose_.pose = global_plan_.back().pose;
+
     // let's get the pose of the robot in the frame of the plan
     geometry_msgs::PoseStamped robot_pose;
     if (!transformPose(tf_,
-                       global_plan_.header.frame_id,
+                       global_plan_[0].header.frame_id,
                        pose, robot_pose, params_->transform_tolerance_)) {
         ROS_ERROR("%s: Unable to transform robot pose into global plan's frame", controller_name_.c_str());
         return false;
@@ -423,20 +424,20 @@ bool VectorPursuitController::transformGlobalPlan(
     double max_costmap_extent = getCostmapMaxExtent();
 
     auto closest_pose_upper_bound = first_after_integrated_distance(
-        global_plan_.poses.begin(), global_plan_.poses.end(), params_->max_robot_pose_search_dist_);
+        global_plan_.begin(), global_plan_.end(), params_->max_robot_pose_search_dist_);
 
     // First find the closest pose on the path to the robot
     // bounded by when the path turns around (if it does) so we don't get a pose from a later
     // portion of the path
     auto transformation_begin = min_by(
-        global_plan_.poses.begin(), closest_pose_upper_bound,
+        global_plan_.begin(), closest_pose_upper_bound,
         [&robot_pose](const geometry_msgs::PoseStamped & ps) {
         return euclidean_distance(robot_pose, ps);
         });
 
     // Find points up to max_transform_dist so we only transform them.
     auto transformation_end = std::find_if(
-        transformation_begin, global_plan_.poses.end(),
+        transformation_begin, global_plan_.end(),
         [&](const auto & pose) {
         return euclidean_distance(pose, robot_pose) > max_costmap_extent;
         });
@@ -444,7 +445,7 @@ bool VectorPursuitController::transformGlobalPlan(
     // Lambda to transform a PoseStamped from global frame to local
     auto transformGlobalPoseToLocal = [&](const auto & global_plan_pose) {
         geometry_msgs::PoseStamped stamped_pose, transformed_pose;
-        stamped_pose.header.frame_id = global_plan_.header.frame_id;
+        stamped_pose.header.frame_id = global_plan_[0].header.frame_id;
         stamped_pose.header.stamp = robot_pose.header.stamp;
         stamped_pose.pose = global_plan_pose.pose;
         if (!transformPose(tf_,
@@ -467,7 +468,7 @@ bool VectorPursuitController::transformGlobalPlan(
 
     // Remove the portion of the global plan that we've already passed so we don't
     // process it on the next iteration (this is called path pruning)
-    global_plan_.poses.erase(begin(global_plan_.poses), transformation_begin);
+    global_plan_.erase(begin(global_plan_), transformation_begin);
     global_path_pub_.publish(transformed_plan);
 
     if (transformed_plan.poses.empty()) {
