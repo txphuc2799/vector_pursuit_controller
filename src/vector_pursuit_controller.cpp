@@ -126,10 +126,6 @@ void VectorPursuitController::reconfigureCB(Config& config, uint32_t level)
   params_->max_robot_pose_search_dist_ = config.max_robot_pose_search_dist;
   params_->use_interpolation_ = config.use_interpolation;
   params_->use_heading_from_path_ = config.use_heading_from_path;
-  params_->goal_angular_vel_scaling_angle_ = config.goal_angular_vel_scaling_angle;
-  params_->goal_angle_scaling_factor_ = config.goal_angle_scaling_factor;
-  params_->rotate_to_goal_max_angular_vel_ = config.rotate_to_goal_max_angular_vel;
-  params_->rotate_to_goal_min_angular_vel_ = config.rotate_to_goal_min_angular_vel;
   params_->xy_goal_tolerance_ = config.xy_goal_tolerance;
   params_->yaw_tolerance_ = config.yaw_tolerance;
 }
@@ -285,13 +281,7 @@ bool VectorPursuitController::computeVelocityCommands(geometry_msgs::Twist& cmd_
     // Check if xy reached
     if (isGoalReached(robot_pose, angle_to_goal)) {
         if (shouldRotateToGoalHeading(angle_to_goal)) {
-            rotateToHeading(linear_vel,
-                            angular_vel,
-                            angle_to_goal,
-                            params_->goal_angular_vel_scaling_angle_,
-                            params_->goal_angle_scaling_factor_,
-                            params_->rotate_to_goal_min_angular_vel_,
-                            params_->rotate_to_goal_max_angular_vel_);
+            rotateToHeading(linear_vel, angular_vel, angle_to_goal, last_cmd_vel_);
             ROS_DEBUG("%s: Rotating to GOAL heading...", controller_name_.c_str());
         }
         else {
@@ -300,13 +290,7 @@ bool VectorPursuitController::computeVelocityCommands(geometry_msgs::Twist& cmd_
             angular_vel = 0.0;
         }
     } else if (shouldRotateToPath(lookahead_point, angle_to_heading, sign)) {
-        rotateToHeading(linear_vel,
-                        angular_vel,
-                        angle_to_heading,
-                        params_->path_angular_vel_scaling_angle_ + params_->rotate_to_heading_min_angle_,
-                        params_->path_angle_scaling_factor_,
-                        params_->rotate_to_path_min_angular_vel_,
-                        params_->rotate_to_path_max_angular_vel_);
+        rotateToHeading(linear_vel, angular_vel, angle_to_heading, last_cmd_vel_);
         ROS_DEBUG("%s: Rotating to PATH heading...", controller_name_.c_str());
     }
     else {
@@ -638,36 +622,18 @@ bool VectorPursuitController::shouldRotateToGoalHeading(double angle_to_goal)
 }
 
 void VectorPursuitController::rotateToHeading(
-    double & linear_vel,
-    double & angular_vel,
-    const double & angle_to_path,
-    double angular_vel_scaling_angle,
-    double angle_scaling_factor,
-    double min_angular_vel,
-    double max_angular_vel)
+    double & linear_vel, double & angular_vel,
+    const double & angle_to_path, const geometry_msgs::Twist & curr_speed)
 {
     // Rotate in place using max angular velocity / acceleration possible
     linear_vel = 0.0;
     const double sign = angle_to_path > 0.0 ? 1.0 : -1.0;
-    double factor;
-        
-    if (std::abs(angle_to_path) < angular_vel_scaling_angle) {
-        factor = std::abs(angle_to_path) / angle_scaling_factor;
-    } else {
-        factor = 1.0;
-    }
+    angular_vel = sign * params_->rotate_to_heading_angular_vel_;
 
-    double rotate_to_path_angular_vel = max_angular_vel;
-    double unbounded_angular_vel = rotate_to_path_angular_vel * factor;
-
-    if (unbounded_angular_vel < min_angular_vel) {
-        rotate_to_path_angular_vel = min_angular_vel;
-    } else {
-        rotate_to_path_angular_vel = unbounded_angular_vel;
-    }
-    angular_vel = sign*clamp(rotate_to_path_angular_vel,
-                             min_angular_vel,
-                             max_angular_vel);
+    const double & dt = control_duration_;
+    const double min_feasible_angular_speed = curr_speed.angular.z - params_->max_angular_accel_ * dt;
+    const double max_feasible_angular_speed = curr_speed.angular.z + params_->max_angular_accel_ * dt;
+    angular_vel = clamp(angular_vel, min_feasible_angular_speed, max_feasible_angular_speed);
 }
 
 bool VectorPursuitController::costAtPose(const double & x, const double & y, double &cost)

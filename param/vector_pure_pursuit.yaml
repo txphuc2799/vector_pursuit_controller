@@ -3,8 +3,8 @@ VectorPursuitController:
   odom_topic: /odometry/filtered
   control_frequency: 20.0
   k: 6.0
-  desired_linear_vel: 0.7
-  desired_linear_vel_backwards: 0.2
+  desired_linear_vel: 0.75
+  desired_linear_vel_backwards: 0.25
   min_turning_radius: 0.25
   lookahead_dist: 1.0
   min_lookahead_dist: 0.5
@@ -23,21 +23,14 @@ VectorPursuitController:
   cost_scaling_gain: 1.0
   inflation_cost_scaling_factor: 3.0
   use_rotate_to_heading: true
+  rotate_to_heading_angular_vel: 0.45
   rotate_to_heading_min_angle: 0.55
-  path_angular_vel_scaling_angle: 0.26
-  path_angle_scaling_factor: 1.3
-  rotate_to_path_max_angular_vel: 0.3
-  rotate_to_path_min_angular_vel: 0.1
   allow_reversing: false
-  max_angular_accel: 1.5
+  max_angular_accel: 1.0
   max_linear_accel: 1.5
   max_lateral_accel: 0.15
   max_robot_pose_search_dist: 10.0
   use_interpolation: true
   use_heading_from_path: false
-  goal_angular_vel_scaling_angle: 0.26
-  goal_angle_scaling_factor: 0.8
-  rotate_to_goal_max_angular_vel: 0.4
-  rotate_to_goal_min_angular_vel: 0.1
   xy_goal_tolerance: 0.05
   yaw_tolerance: 0.02

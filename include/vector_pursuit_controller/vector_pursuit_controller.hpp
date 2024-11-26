@@ -252,16 +252,12 @@ protected:
      * @brief Create a smooth and kinematically smoothed rotation command
      * @param linear_vel linear velocity
      * @param angular_vel angular velocity
-     * @param angle_to_path Angle of robot output relatie to carrot marker
-     * @param angular_vel_scaling_angle Angle threshold for rotating smoothly
+     * @param angle_to_path Angle of robot output relative to lookahead point
+     * @param curr_speed the current robot speed
      */
-    void rotateToHeading(double & linear_vel,
-                         double & angular_vel,
-                         const double & angle_to_path,
-                         double angular_vel_scaling_angle,
-                         double angle_scaling_factor,
-                         double min_angular_vel,
-                         double max_angular_vel);
+    void rotateToHeading(
+        double & linear_vel, double & angular_vel,
+        const double & angle_to_path, const geometry_msgs::Twist & curr_speed);
 
     /**
      * @brief checks for the cusp position

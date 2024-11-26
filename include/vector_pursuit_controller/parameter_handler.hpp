@@ -52,11 +52,8 @@ struct Parameters
     double cost_scaling_gain_;
     double inflation_cost_scaling_factor_;
     bool use_rotate_to_heading_;
+    double rotate_to_heading_angular_vel_;
     double rotate_to_heading_min_angle_;
-    double path_angular_vel_scaling_angle_;
-    double path_angle_scaling_factor_;
-    double rotate_to_path_max_angular_vel_;
-    double rotate_to_path_min_angular_vel_;
     double max_angular_accel_;
     double max_linear_accel_;
     double goal_dist_tol_;
@@ -65,10 +62,6 @@ struct Parameters
     bool allow_reversing_;
     bool is_reversing_;
     bool use_heading_from_path_;
-    double goal_angular_vel_scaling_angle_;
-    double goal_angle_scaling_factor_;
-    double rotate_to_goal_max_angular_vel_;
-    double rotate_to_goal_min_angular_vel_;
     double xy_goal_tolerance_;
     double yaw_tolerance_;
 };
