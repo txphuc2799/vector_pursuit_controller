@@ -131,7 +131,8 @@ void VectorPursuitController::reconfigureCB(Config& config, uint32_t level)
 }
 
 double VectorPursuitController::getLookAheadDistance(
-    const geometry_msgs::Twist & speed)
+    const geometry_msgs::Twist & speed,
+    const nav_msgs::Path & transformed_plan)
 {
     // If using velocity-scaled look ahead distances, find and clamp the dist
     // Else, use the static look ahead distance
@@ -142,6 +143,18 @@ double VectorPursuitController::getLookAheadDistance(
     lookahead_dist = clamp(lookahead_dist, params_->min_lookahead_dist_, params_->max_lookahead_dist_);
     }
 
+    if (params_->allow_reversing_) {
+        // Find the first pose which is at a distance greater than the lookahead distance
+        auto goal_pose_it = std::find_if(
+            transformed_plan.poses.begin(), transformed_plan.poses.end(), [&](const geometry_msgs::PoseStamped & ps)
+            {
+            return std::hypot(ps.pose.position.x, ps.pose.position.y) >= params_->lookahead_dist_;
+            });
+        
+        if (goal_pose_it->pose.position.x < 0.0) {
+            lookahead_dist = params_->lookahead_dist_;
+        }
+    }
     return lookahead_dist;
 }
 
@@ -244,7 +257,7 @@ bool VectorPursuitController::computeVelocityCommands(geometry_msgs::Twist& cmd_
     }
 
     // Find look ahead distance and point on path
-    double lookahead_dist = getLookAheadDistance(last_cmd_vel_);
+    double lookahead_dist = getLookAheadDistance(last_cmd_vel_, transformed_plan);
 
     // Cusp check
     const double dist_to_cusp = getCuspDist(transformed_plan);

@@ -139,7 +139,9 @@ protected:
      * @param cmd the current speed to use to compute lookahead point
      * @return lookahead distance
      */
-    double getLookAheadDistance(const geometry_msgs::Twist &);
+    double getLookAheadDistance(
+        const geometry_msgs::Twist &,
+        const nav_msgs::Path &);
 
     /**
      * @brief Find the intersection a circle and a line segment.
