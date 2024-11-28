@@ -55,8 +55,10 @@ struct Parameters
     double rotate_to_heading_angular_vel_;
     double rotate_to_heading_min_angle_;
     double max_angular_accel_;
+    double max_angular_deccel_;
     double max_linear_accel_;
-    double goal_dist_tol_;
+    double min_angular_vel_;
+    double angle_threshold_;
     double max_robot_pose_search_dist_;
     bool use_interpolation_;
     bool allow_reversing_;
