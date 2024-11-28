@@ -121,8 +121,10 @@ void VectorPursuitController::reconfigureCB(Config& config, uint32_t level)
   params_->cost_scaling_gain_ = config.cost_scaling_gain;
   params_->inflation_cost_scaling_factor_ = config.inflation_cost_scaling_factor;
   params_->max_angular_accel_ = config.max_angular_accel;
+  params_->max_angular_deccel_ = config.max_angular_deccel;
   params_->max_linear_accel_ = config.max_linear_accel;
   params_->max_lateral_accel_ = config.max_lateral_accel;
+  params_->angle_threshold_ = config.angle_threshold;
   params_->max_robot_pose_search_dist_ = config.max_robot_pose_search_dist;
   params_->use_interpolation_ = config.use_interpolation;
   params_->use_heading_from_path_ = config.use_heading_from_path;
@@ -602,15 +604,18 @@ geometry_msgs::PoseStamped VectorPursuitController::getLookAheadPoint(
 
 bool VectorPursuitController::shouldRotateToPath(
   const geometry_msgs::PoseStamped & target_pose,
-  double & angle_to_path, double & sign)
+  double & angular_distance_to_heading, double & sign)
 {
   // Whether we should rotate robot to rough path heading
-  angle_to_path = atan2(target_pose.pose.position.y, target_pose.pose.position.x);
+  double angle_to_path = atan2(target_pose.pose.position.y, target_pose.pose.position.x);
 
   // In case we are reversing
   if (sign < 0.0) {
     angle_to_path = angles::normalize_angle(angle_to_path + M_PI);
   }
+
+  angular_distance_to_heading = angle_to_path >= 0.0 ? angle_to_path - params_->rotate_to_heading_min_angle_ :
+                                                       angle_to_path + params_->rotate_to_heading_min_angle_;
 
   return params_->use_rotate_to_heading_ && std::abs(angle_to_path) > params_->rotate_to_heading_min_angle_;
 }
@@ -629,11 +634,17 @@ void VectorPursuitController::rotateToHeading(
     linear_vel = 0.0;
     const double sign = angle_to_path > 0.0 ? 1.0 : -1.0;
     angular_vel = sign * params_->rotate_to_heading_angular_vel_;
-
     const double & dt = control_duration_;
+
     const double min_feasible_angular_speed = curr_speed.angular.z - params_->max_angular_accel_ * dt;
     const double max_feasible_angular_speed = curr_speed.angular.z + params_->max_angular_accel_ * dt;
     angular_vel = clamp(angular_vel, min_feasible_angular_speed, max_feasible_angular_speed);
+
+    if (fabs(angle_to_path) < params_->angle_threshold_) {
+        angular_vel = 
+            sign * clamp(params_->rotate_to_heading_angular_vel_ * fabs(angle_to_path) / params_->max_angular_deccel_,
+                         params_->min_angular_vel_, params_->rotate_to_heading_angular_vel_);
+    }
 }
 
 bool VectorPursuitController::costAtPose(const double & x, const double & y, double &cost)

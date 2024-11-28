@@ -6,7 +6,7 @@ VectorPursuitController:
   desired_linear_vel: 0.75
   desired_linear_vel_backwards: 0.25
   min_turning_radius: 0.25
-  lookahead_dist: 1.0
+  lookahead_dist: 1.5
   min_lookahead_dist: 0.5
   max_lookahead_dist: 1.5
   lookahead_time: 1.7
@@ -23,12 +23,15 @@ VectorPursuitController:
   cost_scaling_gain: 1.0
   inflation_cost_scaling_factor: 3.0
   use_rotate_to_heading: true
-  rotate_to_heading_angular_vel: 0.45
+  rotate_to_heading_angular_vel: 0.5
   rotate_to_heading_min_angle: 0.55
   allow_reversing: false
-  max_angular_accel: 1.0
+  max_angular_accel: 0.7
+  max_angular_deccel: 0.3
   max_linear_accel: 1.5
   max_lateral_accel: 0.15
+  min_angular_vel: 0.1
+  angle_threshold: 0.35
   max_robot_pose_search_dist: 10.0
   use_interpolation: true
   use_heading_from_path: false
